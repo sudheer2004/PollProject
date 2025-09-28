@@ -1,27 +1,26 @@
 {
-  "name": "live-poll-backend",
+  "name": "live-polling-backend",
   "version": "1.0.0",
-  "description": "Backend for Live Polling System with Express, Socket.io, and MongoDB",
+  "description": "Backend for Live Polling System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "polling",
-    "express",
-    "socket.io",
-    "mongodb"
-  ],
+  "keywords": ["polling", "realtime", "socket.io", "education"],
   "author": "Your Name",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "mongoose": "^7.5.0",
-    "socket.io": "^4.7.0"
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5",
+    "mongoose": "^7.5.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
