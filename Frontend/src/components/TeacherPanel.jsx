@@ -143,32 +143,17 @@ const TeacherPanel = () => {
   return (
     <div className="min-h-screen bg-white">
       <div className="p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header Badge */}
-          <div className="flex justify-start">
-            <Badge className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-              Intervue Poll
-            </Badge>
-          </div>
-
-          {/* Title */}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Let's Get Started</h1>
-            <p className="text-gray-600 text-base">
-              you'll have the ability to create and manage polls, ask questions, and monitor your students' responses in real-time.
-            </p>
-          </div>
-
+        <div className="max-w-4xl mx-auto">
           {/* Connection Status */}
           {!isConnected && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="text-yellow-800 text-sm">
                 Connecting to server...
               </div>
             </div>
           )}
 
-          {/* Question Form Component */}
+          {/* Question Form Component - Now contains all header elements */}
           <QuestionForm
             question={question}
             setQuestion={setQuestion}

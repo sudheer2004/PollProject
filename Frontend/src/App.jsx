@@ -4,12 +4,18 @@ import TeacherPanel from "./components/TeacherPanel";
 import StudentPanel from "./components/StudentPanel";
 
 export default function App() {
-  const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedRole, setSelectedRole] = useState("");
   const [roleConfirmed, setRoleConfirmed] = useState(false);
+
+  // Handle role selection from landing page
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    setRoleConfirmed(true);
+  };
 
   // Reset function to go back to role selection
   const resetToRoleSelection = () => {
-    setSelectedRole(null);
+    setSelectedRole("");
     setRoleConfirmed(false);
   };
 
@@ -34,110 +40,86 @@ export default function App() {
     );
   }
 
-  // Role selection page
+  // Landing page with Figma design
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-2xl mx-auto space-y-8">
-        {/* Header Badge */}
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-4xl mx-auto text-center space-y-6">
+        {/* Top Badge */}
         <div className="flex justify-center">
-          <div className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-            Interview Poll
+          <div 
+            className="px-6 py-2 text-white font-medium text-sm rounded-3xl"
+            style={{ 
+              background: "linear-gradient(135deg, #7565D9 0%, #4D0ACD 100%)",
+              borderRadius: "24px"
+            }}
+          >
+            ⚡ Intervue Poll
           </div>
         </div>
 
-        {/* Title and Description */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">
-            Welcome to the{" "}
-            <span className="text-purple-600">Live Polling System</span>
+        {/* Main Heading */}
+        <div className="space-y-4">
+          <h1 className="text-5xl font-normal leading-tight">
+            <span className="text-gray-800">Welcome to the</span> <span className="text-black font-medium">Live Polling System</span>
           </h1>
-          <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Please select the role that best describes you to begin using the
-            live polling system
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto leading-relaxed">
+            Please select the role that best describes you to begin using the live polling system
           </p>
         </div>
 
         {/* Role Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-6 mt-12">
+        <div className="flex justify-center gap-8">
           {/* Student Card */}
           <div
-            className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 transform hover:scale-105 ${
-              selectedRole === "student"
-                ? "border-purple-600 bg-purple-50 dark:bg-purple-950/20 shadow-lg"
-                : "border-border hover:border-purple-300 hover:shadow-md"
-            }`}
             onClick={() => setSelectedRole("student")}
+            className={`w-96 h-36 p-6 border-2 rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+              selectedRole === "student"
+                ? "border-violet-500 bg-violet-50"
+                : "border-gray-200 bg-white"
+            }`}
+            style={{ width: "387px", height: "143px" }}
           >
-            <div className="flex items-center mb-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                <span className="text-blue-600 font-semibold text-sm">S</span>
-              </div>
-              <h3 className="text-xl font-semibold text-foreground">
-                I'm a Student
-              </h3>
+            <div className="text-left h-full flex flex-col justify-center">
+              <h3 className="text-xl font-medium text-black mb-2">I'm a Student</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Lorem Ipsum is simply dummy text of the printing and typesetting industry
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Participate in live polls, submit answers in real-time, and see
-              how your responses compare with classmates.
-            </p>
-
-            {selectedRole === "student" && (
-              <div className="mt-3 text-purple-600 text-sm font-medium">
-                ✓ Selected
-              </div>
-            )}
           </div>
 
           {/* Teacher Card */}
           <div
-            className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 transform hover:scale-105 ${
-              selectedRole === "teacher"
-                ? "border-purple-600 bg-purple-50 dark:bg-purple-950/20 shadow-lg"
-                : "border-border hover:border-purple-300 hover:shadow-md"
-            }`}
             onClick={() => setSelectedRole("teacher")}
+            className={`w-96 h-36 p-6 border-2 rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-lg ${
+              selectedRole === "teacher"
+                ? "border-violet-500 bg-violet-50"
+                : "border-gray-200 bg-white"
+            }`}
+            style={{ width: "387px", height: "143px" }}
           >
-            <div className="flex items-center mb-3">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <span className="text-green-600 font-semibold text-sm">T</span>
-              </div>
-              <h3 className="text-xl font-semibold text-foreground">
-                I'm a Teacher
-              </h3>
+            <div className="text-left h-full flex flex-col justify-center">
+              <h3 className="text-xl font-medium text-black mb-2">I'm a Teacher</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Submit answers and view live poll results in real-time.
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Create engaging questions, manage polls, and view live results as
-              students respond in real-time.
-            </p>
-
-            {selectedRole === "teacher" && (
-              <div className="mt-3 text-purple-600 text-sm font-medium">
-                ✓ Selected
-              </div>
-            )}
           </div>
         </div>
 
         {/* Continue Button */}
-        <div className="flex justify-center pt-8">
+        <div className="flex justify-center pt-4">
           <Button
-            className={`px-12 py-3 text-base transition-all duration-200 ${
-              selectedRole
-                ? "bg-purple-600 hover:bg-purple-700 transform hover:scale-105"
-                : "bg-gray-300 cursor-not-allowed"
-            }`}
-            disabled={!selectedRole}
-            onClick={() => setRoleConfirmed(true)}
+            onClick={() => selectedRole && handleRoleSelect(selectedRole)}
+            className="text-white font-medium text-base px-12 py-4 transition-all duration-200 hover:shadow-lg"
+            style={{
+              background: "linear-gradient(135deg, #8F64E1 0%, #1D68BD 100%)",
+              borderRadius: "34px",
+              width: "234px",
+              height: "58px"
+            }}
           >
-            {selectedRole
-              ? `Continue as ${selectedRole}`
-              : "Select a role to continue"}
+            Continue
           </Button>
-        </div>
-
-        {/* Additional Info */}
-        <div className="text-center text-muted-foreground text-sm">
-          <p>You can switch roles anytime by returning to this page</p>
         </div>
       </div>
     </div>

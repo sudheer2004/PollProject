@@ -1,110 +1,276 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
 
-const PollHistory = ({ history, onBack }) => {
-  const getPercentage = (count, total) => {
-    return total > 0 ? Math.round((count / total) * 100) : 0;
-  };
+const PollHistory = ({ history = [], onBack }) => {
+  // Sample history data if none provided
+  const sampleHistory = [
+    {
+      _id: "1",
+      question: "Which planet is known as the Red Planet?",
+      results: {
+        Mars: 75,
+        Venus: 5,
+        Jupiter: 5,
+        Saturn: 15
+      },
+      timeLimit: 30,
+      createdAt: new Date().toISOString()
+    },
+    {
+      _id: "2", 
+      question: "What is the capital of France?",
+      results: {
+        Paris: 85,
+        London: 8,
+        Berlin: 4,
+        Madrid: 3
+      },
+      timeLimit: 20,
+      createdAt: new Date(Date.now() - 86400000).toISOString()
+    }
+  ];
+
+  const pollHistory = history.length > 0 ? history : sampleHistory;
 
   const getTotalResponses = (results) => {
     return Object.values(results || {}).reduce((sum, count) => sum + count, 0);
   };
 
-  return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">View Poll History</h1>
-          <Button 
-            onClick={onBack}
-            variant="outline" 
-            className="rounded-full px-6"
-          >
-            ← Back
-          </Button>
-        </div>
+  const getPercentage = (count, total) => {
+    return total > 0 ? Math.round((count / total) * 100) : 0;
+  };
 
-        {/* History Content */}
-        {history.length === 0 ? (
+  const convertResultsToOptions = (results) => {
+    const total = getTotalResponses(results);
+    return Object.entries(results || {}).map(([text, count], index) => ({
+      text,
+      percentage: getPercentage(count, total),
+      number: index + 1
+    }));
+  };
+
+  return (
+    <div className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
+      {/* Back Button - Stays at top */}
+      <div className="w-full flex justify-end mb-4 sm:mb-6 lg:mb-8">
+        <button
+          onClick={onBack}
+          className="text-white font-medium flex items-center justify-center gap-2"
+          style={{
+            width: '120px',
+            height: '45px',
+            background: '#8F64E1',
+            borderRadius: '34px',
+            fontFamily: 'Sora, sans-serif',
+            fontSize: '14px',
+            fontWeight: 500,
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+      {/* Header */}
+      <div className="flex justify-center mb-4 sm:mb-6 lg:mb-8" style={{ marginTop: '40px' }}>
+        <div className="flex items-center justify-between" style={{ width: '727px' }}>
+          <div>
+            <span 
+              style={{
+                fontFamily: 'Sora, sans-serif',
+                fontSize: '40px',
+                fontWeight: 400,
+                color: '#000000'
+              }}
+            >
+              View{" "}
+            </span>
+            <span 
+              style={{
+                fontFamily: 'Sora, sans-serif',
+                fontSize: '40px',
+                fontWeight: 600,
+                color: '#000000'
+              }}
+            >
+              Poll History
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* History Content */}
+      <div className="max-w-4xl mx-auto">
+        {pollHistory.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-gray-400 text-xl">📊</span>
             </div>
-            <h3 className="text-xl font-medium text-gray-900 mb-2">No Poll History</h3>
-            <p className="text-gray-500">You haven't created any polls yet. Start by asking your first question!</p>
+            <h3 
+              className="text-xl font-medium mb-2"
+              style={{
+                fontFamily: 'Sora, sans-serif',
+                color: '#000000'
+              }}
+            >
+              No Poll History
+            </h3>
+            <p 
+              style={{
+                fontFamily: 'Sora, sans-serif',
+                color: '#666666'
+              }}
+            >
+              You haven't created any polls yet. Start by asking your first question!
+            </p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {history.map((poll, pollIdx) => (
-              <div key={poll._id || pollIdx} className="space-y-4">
-                {/* Question Number */}
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Question {pollIdx + 1}
-                </h2>
-                
-                {/* Question Card */}
-                <div className="border border-gray-300 rounded-lg overflow-hidden max-w-2xl">
-                  {/* Question Header */}
-                  <div className="bg-gray-600 text-white p-4">
-                    <p className="text-sm font-medium">{poll.question}</p>
-                  </div>
-                  
-                  {/* Results */}
-                  <div className="bg-white p-4 space-y-3">
-                    {Object.entries(poll.results || {}).map(([option, count], idx) => {
-                      const total = getTotalResponses(poll.results);
-                      const percentage = getPercentage(count, total);
-                      
-                      return (
-                        <div key={option} className="flex items-center">
-                          {/* Progress Bar */}
-                          <div 
-                            className="bg-purple-600 text-white flex items-center px-3 py-2 rounded-md min-h-[40px] relative"
-                            style={{ width: `${Math.max(percentage, 15)}%` }}
-                          >
-                            {/* Option Number Circle */}
-                            <div className="w-6 h-6 bg-white bg-opacity-30 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
-                              <span className="text-white text-xs font-semibold">{idx + 1}</span>
-                            </div>
-                            
-                            {/* Option Text */}
-                            <span className="text-sm font-medium text-white truncate flex-1">
-                              {option}
-                            </span>
-                          </div>
-                          
-                          {/* Percentage Display */}
-                          <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
-                            <span className="text-sm font-semibold text-gray-900">
-                              {percentage}%
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+          <div className="space-y-12">
+            {pollHistory.map((poll, pollIdx) => {
+              const options = convertResultsToOptions(poll.results);
+              
+              return (
+                <div key={poll._id || pollIdx} className="flex justify-center">
+                  <div className="flex flex-col" style={{ width: '727px' }}>
+                    {/* Question Number */}
+                    <div className="mb-6">
+                      <h2 
+                        className="text-left"
+                        style={{
+                          fontFamily: 'Sora, sans-serif',
+                          fontWeight: 600,
+                          fontSize: '22px',
+                          color: '#000000'
+                        }}
+                      >
+                        Question {pollIdx + 1}
+                      </h2>
+                    </div>
 
-                {/* Poll Stats */}
-                <div className="flex items-center gap-6 text-sm text-gray-600">
-                  <span>Total Responses: {getTotalResponses(poll.results)}</span>
-                  <span>Time Limit: {poll.timeLimit}s</span>
-                  {poll.createdAt && (
-                    <span>
-                      Created: {new Date(poll.createdAt).toLocaleDateString()} at{" "}
-                      {new Date(poll.createdAt).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </span>
-                  )}
+                    {/* Question Card - Responsive height based on options */}
+                    <div 
+                      style={{
+                        width: '727px',
+                        minHeight: '200px',
+                        height: 'auto',
+                        border: '1px solid #AF8FF1',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Question Header */}
+                      <div
+                        className="flex items-center px-4"
+                        style={{
+                          width: '727px',
+                          height: '50px',
+                          background: 'linear-gradient(135deg, #343434 0%, #6E6E6E 100%)',
+                          fontFamily: 'Sora, sans-serif',
+                          fontWeight: 600,
+                          fontSize: '17px',
+                          color: 'white'
+                        }}
+                      >
+                        {poll.question}
+                      </div>
+
+                      {/* Options Container */}
+                      <div className="p-6 space-y-4">
+                        {options.map((option, index) => (
+                          <div key={index} className="flex items-center">
+                            {/* Option Bar */}
+                            <div
+                              className="flex items-center relative"
+                              style={{
+                                width: '687px',
+                                height: '55px'
+                              }}
+                            >
+                              {/* Progress Fill */}
+                              <div
+                                className="flex items-center px-4"
+                                style={{
+                                  width: `${Math.max(option.percentage, 25)}%`,
+                                  height: '55px',
+                                  background: '#6766D5',
+                                  borderRadius: '6px',
+                                  position: 'relative',
+                                  zIndex: 2
+                                }}
+                              >
+                                {/* Option Number Circle */}
+                                <div
+                                  className="flex items-center justify-center mr-3 flex-shrink-0"
+                                  style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'white',
+                                    color: '#6766D5',
+                                    fontFamily: 'Sora, sans-serif',
+                                    fontSize: '11px',
+                                    fontWeight: 400
+                                  }}
+                                >
+                                  {option.number}
+                                </div>
+                                
+                                {/* Option Text */}
+                                <span
+                                  className="text-white truncate"
+                                  style={{
+                                    fontFamily: 'Sora, sans-serif',
+                                    fontSize: '16px',
+                                    fontWeight: 400
+                                  }}
+                                >
+                                  {option.text}
+                                </span>
+                              </div>
+
+                              {/* Background Bar */}
+                              <div
+                                className="absolute top-0 left-0 flex items-center justify-end px-4"
+                                style={{
+                                  width: '100%',
+                                  height: '55px',
+                                  background: '#F6F6F6',
+                                  borderRadius: '6px',
+                                  zIndex: 1
+                                }}
+                              >
+                                {/* Percentage Text */}
+                                <span
+                                  style={{
+                                    fontFamily: 'Sora, sans-serif',
+                                    fontSize: '16px',
+                                    fontWeight: 600,
+                                    color: '#000000'
+                                  }}
+                                >
+                                  {option.percentage}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Add Sora Font */}
+      <style jsx>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@100;200;300;400;500;600;700;800@display=swap');
+        
+        * {
+          font-family: 'Sora', sans-serif !important;
+        }
+      `}</style>
     </div>
   );
 };
