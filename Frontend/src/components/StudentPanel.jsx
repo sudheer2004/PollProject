@@ -26,6 +26,7 @@ export default function StudentPanel() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const socketRef = useRef(null);
+  const timerRef = useRef(null); // NEW: Ref for local timer interval
 
   // Initialize socket connection
   useEffect(() => {
@@ -63,16 +64,20 @@ export default function StudentPanel() {
       setError("");
     });
 
-    // Listen for real-time timer updates from server
+    // Listen for real-time timer updates from server (for sync)
     socket.on("timeUpdate", (data) => {
       console.log("Timer update received:", data.timeLeft);
       setTimeLeft(data.timeLeft);
+      console.log("sudheer", data.timeLeft);
     });
 
     socket.on("pollResults", (pollResults) => {
       console.log("Poll results received:", pollResults);
       setResults(pollResults);
-      const total = Object.values(pollResults).reduce((sum, count) => sum + count, 0);
+      const total = Object.values(pollResults).reduce(
+        (sum, count) => sum + count,
+        0,
+      );
       setTotalResponses(total);
     });
 
@@ -83,6 +88,7 @@ export default function StudentPanel() {
       setUserAnswer(answer);
       // Immediately switch to results view after successful submission
       setShowResults(true);
+      // REMOVED: setTimeLeft(data.timeLeft); // Avoid potential reset/jump
     });
 
     socket.on("pollEnded", (data) => {
@@ -90,8 +96,7 @@ export default function StudentPanel() {
       setResults(data.results);
       setTotalResponses(data.totalResponses);
       setShowResults(true);
-      setTimeLeft(0);
-      // Poll is now completely finished, can show final state
+      // REMOVED: setTimeLeft(data.timeLeft || 0); // Avoid reset/jump; let local timer handle
     });
 
     socket.on("error", (errorData) => {
@@ -107,8 +112,24 @@ export default function StudentPanel() {
 
     return () => {
       socket.disconnect();
+      if (timerRef.current) clearInterval(timerRef.current); // Cleanup local timer
     };
   }, []);
+
+  // NEW: Local countdown timer for smooth decrement (synced by server updates)
+  useEffect(() => {
+    if (questionData && timeLeft > 0) {
+      // Start local interval to decrement every second
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => Math.max(0, prev - 1));
+      }, 1000);
+
+      // Cleanup interval when question changes or component unmounts
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }
+  }, [questionData]); // Dependency on questionData to restart for new polls
 
   // Join poll when student name is set
   useEffect(() => {
@@ -119,7 +140,13 @@ export default function StudentPanel() {
 
   // Auto-submit when time runs out (but only if not already submitted)
   useEffect(() => {
-    if (timeLeft === 0 && !hasSubmitted && answer && questionData && !isSubmitting) {
+    if (
+      timeLeft === 0 &&
+      !hasSubmitted &&
+      answer &&
+      questionData &&
+      !isSubmitting
+    ) {
       console.log("Time's up, auto-submitting answer:", answer);
       const timer = setTimeout(() => {
         if (!hasSubmitted && !isSubmitting) {
@@ -169,9 +196,9 @@ export default function StudentPanel() {
     console.log("Submitting answer:", answer);
     setIsSubmitting(true);
     setError("");
-    
+
     socketRef.current.emit("submitAnswer", { studentName, answer });
-    
+
     // Set a timeout to handle if the server doesn't respond
     setTimeout(() => {
       if (isSubmitting) {
@@ -190,7 +217,7 @@ export default function StudentPanel() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // ------------------------
@@ -213,7 +240,10 @@ export default function StudentPanel() {
               Let's Get Started
             </h1>
             <p className="text-gray-600 text-base leading-relaxed">
-              If you're a student, you'll be able to <span className="font-semibold">submit your answers</span>, participate in live polls, and see how your responses compare with your classmates
+              If you're a student, you'll be able to{" "}
+              <span className="font-semibold">submit your answers</span>,
+              participate in live polls, and see how your responses compare with
+              your classmates
             </p>
           </div>
 
@@ -264,14 +294,14 @@ export default function StudentPanel() {
           <Badge className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
             ⚡ Intervue Poll
           </Badge>
-          
+
           <div className="space-y-6">
             <LoadingSpinner />
-            
+
             <h2 className="text-2xl font-bold text-gray-900">
               Wait for the teacher to ask questions..
             </h2>
-            
+
             {!isConnected && (
               <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
                 Connection lost. Please refresh the page.
@@ -293,7 +323,9 @@ export default function StudentPanel() {
           {/* Question Header with Timer */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Question 1</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Question 1
+              </h3>
               <div className="flex items-center text-red-600">
                 <span className="text-lg">⏰</span>
                 <span className="ml-1 font-mono">
@@ -302,36 +334,45 @@ export default function StudentPanel() {
               </div>
             </div>
           </div>
-          
+
           {/* Question Card */}
           <div className="border border-gray-300 rounded-lg overflow-hidden mx-auto max-w-lg">
             {/* Question Header */}
             <div className="bg-gray-600 text-white p-4">
               <p className="text-sm">{questionData?.question}</p>
             </div>
-            
+
             {/* Results */}
             <div className="bg-white p-4 space-y-3">
               {Object.entries(results).map(([option, count], idx) => {
-                const percentage = totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0;
+                const percentage =
+                  totalResponses > 0
+                    ? Math.round((count / totalResponses) * 100)
+                    : 0;
                 const isUserAnswer = option === userAnswer;
-                
+
                 return (
                   <div key={option} className="flex items-center">
                     {/* Progress Bar */}
-                    <div 
-                      className={`${isUserAnswer ? 'bg-green-600' : 'bg-purple-600'} text-white flex items-center px-3 py-2 rounded-md min-h-[40px]`}
+                    <div
+                      className={`${isUserAnswer ? "bg-green-600" : "bg-purple-600"} text-white flex items-center px-3 py-2 rounded-md min-h-[40px]`}
                       style={{ width: `${Math.max(percentage, 15)}%` }}
                     >
                       <div className="w-6 h-6 bg-white bg-opacity-30 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
-                        <span className="text-white text-xs font-semibold">{idx + 1}</span>
+                        <span className="text-white text-xs font-semibold">
+                          {idx + 1}
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-white truncate">{option}</span>
+                      <span className="text-sm font-medium text-white truncate">
+                        {option}
+                      </span>
                     </div>
-                    
+
                     {/* Percentage */}
                     <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
-                      <span className="text-sm font-semibold text-gray-900">{percentage}%</span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {percentage}%
+                      </span>
                     </div>
                   </div>
                 );
@@ -410,24 +451,45 @@ export default function StudentPanel() {
                       <div className="text-sm text-gray-500">
                         Waiting for other students... Timer continues below
                       </div>
-                      
+
                       {/* Show live results if available */}
                       {results && Object.keys(results).length > 0 && (
                         <div className="mt-6 space-y-2">
-                          <div className="text-sm text-gray-600 mb-3">Live Results:</div>
-                          {Object.entries(results).map(([option, count], idx) => {
-                            const total = Object.values(results).reduce((sum, c) => sum + c, 0);
-                            const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-                            const isUserAnswer = option === userAnswer;
-                            
-                            return (
-                              <div key={option} className="flex items-center text-sm">
-                                <div className={`w-4 h-4 rounded-full mr-2 ${isUserAnswer ? 'bg-green-500' : 'bg-purple-500'}`}></div>
-                                <span className={`flex-1 ${isUserAnswer ? 'font-medium' : ''}`}>{option}</span>
-                                <span className="font-medium">{percentage}%</span>
-                              </div>
-                            );
-                          })}
+                          <div className="text-sm text-gray-600 mb-3">
+                            Live Results:
+                          </div>
+                          {Object.entries(results).map(
+                            ([option, count], idx) => {
+                              const total = Object.values(results).reduce(
+                                (sum, c) => sum + c,
+                                0,
+                              );
+                              const percentage =
+                                total > 0
+                                  ? Math.round((count / total) * 100)
+                                  : 0;
+                              const isUserAnswer = option === userAnswer;
+
+                              return (
+                                <div
+                                  key={option}
+                                  className="flex items-center text-sm"
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded-full mr-2 ${isUserAnswer ? "bg-green-500" : "bg-purple-500"}`}
+                                  ></div>
+                                  <span
+                                    className={`flex-1 ${isUserAnswer ? "font-medium" : ""}`}
+                                  >
+                                    {option}
+                                  </span>
+                                  <span className="font-medium">
+                                    {percentage}%
+                                  </span>
+                                </div>
+                              );
+                            },
+                          )}
                         </div>
                       )}
                     </div>
@@ -451,9 +513,13 @@ export default function StudentPanel() {
                           className="mr-3 h-4 w-4 text-purple-600"
                           disabled={isSubmitting}
                         />
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 text-xs font-semibold ${
-                          answer === opt ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
-                        }`}>
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 text-xs font-semibold ${
+                            answer === opt
+                              ? "bg-purple-600 text-white"
+                              : "bg-gray-300 text-gray-600"
+                          }`}
+                        >
                           {idx + 1}
                         </div>
                         <span className="text-gray-900">{opt}</span>
@@ -465,7 +531,9 @@ export default function StudentPanel() {
                   <div className="text-center py-8">
                     <LoadingSpinner />
                     <div className="text-gray-600 mt-4">
-                      {hasSubmitted ? "Time's up! Waiting for final results..." : "Time's up! Poll ended without submission"}
+                      {hasSubmitted
+                        ? "Time's up! Waiting for final results..."
+                        : "Time's up! Poll ended without submission"}
                     </div>
                     {hasSubmitted && userAnswer && (
                       <div className="mt-2 text-sm text-purple-600">

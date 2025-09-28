@@ -393,18 +393,15 @@ io.on("connection", (socket) => {
       // Update results
       currentPoll.results[answer] = (currentPoll.results[answer] || 0) + 1;
 
-      // IMMEDIATELY send confirmation and results to the submitting student
+      // Immediately confirm submission to the student  
       socket.emit("answerSubmitted", { 
         answer: answer,
         timestamp: answerData.timestamp,
-        timeLeft: calculateTimeRemaining()
+        timeLeft: calculateTimeRemaining() // Send current time left
       });
       
-      // IMMEDIATELY send updated results to the submitting student
-      socket.emit("pollResults", currentPoll.results);
-      
-      // Then broadcast to everyone else
-      socket.broadcast.emit("pollResults", currentPoll.results);
+      // Immediately broadcast updated results to ALL clients
+      io.emit("pollResults", currentPoll.results);
 
       const totalResponses = Object.values(currentPoll.results).reduce((sum, count) => sum + count, 0);
       log(`Answer submitted: ${studentName} -> "${answer}" (${totalResponses}/${connectedStudents.size} responses)`, "INFO");

@@ -63,7 +63,7 @@ const LiveResults = ({ results, question, onNewQuestion, onViewHistory, timerEnd
                       <div className="w-6 h-6 bg-white bg-opacity-30 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
                         <span className="text-white text-xs font-semibold">{idx + 1}</span>
                       </div>
-                      <span className="text-sm font-medium text-white truncate">{option}</span>
+                     <span className="text-sm font-medium text-white">{option}</span>
                     </div>
                     
                     {/* Percentage */}
