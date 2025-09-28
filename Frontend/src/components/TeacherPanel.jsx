@@ -12,10 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Users, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
-// LiveResults Component
-const LiveResults = ({ results, question, onNewQuestion }) => {
+// LiveResults Component matching the exact image
+const LiveResults = ({ results, question, onNewQuestion, onViewHistory, timerEnded }) => {
   const getTotalResponses = () => {
     return Object.values(results).reduce((sum, count) => sum + count, 0);
   };
@@ -26,45 +26,72 @@ const LiveResults = ({ results, question, onNewQuestion }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Question</h3>
-      
-      <div className="bg-gray-700 text-white rounded-t-lg p-4 mb-0">
-        <p className="text-sm">{question}</p>
-      </div>
+    <div className="relative">
+      {/* View Poll History Button - Top Right */}
+      {timerEnded && (
+        <div className="absolute top-0 right-0">
+          <Button 
+            onClick={onViewHistory}
+            className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-full text-sm flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            View Poll History
+          </Button>
+        </div>
+      )}
 
-      <div className="border border-gray-300 rounded-b-lg p-4 space-y-3">
-        {Object.entries(results).map(([option, count], idx) => {
-          const percentage = getPercentage(count);
-
-          return (
-            <div key={option} className="flex items-center gap-0">
-              <div className="flex items-center bg-indigo-500 text-white rounded-md px-3 py-2 min-w-0" style={{ width: `${Math.max(percentage, 10)}%` }}>
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
-                  <span className="text-white text-xs font-semibold">
-                    {idx + 1}
-                  </span>
-                </div>
-                <span className="text-sm font-medium truncate">{option}</span>
-              </div>
-              
-              <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
-                <span className="text-sm font-semibold text-gray-900">
-                  {percentage}%
-                </span>
-              </div>
+      {/* Centered Question Card */}
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="w-full max-w-xl">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Question</h3>
+            
+            <div className="bg-gray-700 text-white rounded-t-lg p-4 mb-0">
+              <p className="text-sm">{question}</p>
             </div>
-          );
-        })}
-      </div>
 
-      <div className="mt-6 text-center">
-        <Button 
-          onClick={onNewQuestion}
-          className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-6 rounded-full text-base"
-        >
-          + Ask a new question
-        </Button>
+            <div className="border border-t-0 border-gray-300 rounded-b-lg p-4 space-y-3">
+              {Object.entries(results).map(([option, count], idx) => {
+                const percentage = getPercentage(count);
+
+                return (
+                  <div key={option} className="flex items-center gap-0">
+                    <div 
+                      className="flex items-center bg-indigo-500 text-white rounded-md px-3 py-2.5 transition-all duration-500" 
+                      style={{ width: `${Math.max(percentage, 15)}%`, minWidth: '15%' }}
+                    >
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
+                        <span className="text-white text-xs font-semibold">
+                          {idx + 1}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium truncate">{option}</span>
+                    </div>
+                    
+                    <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {percentage}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Ask New Question Button - Below Card, Right Aligned */}
+          <div className="mt-6 flex justify-end">
+            <Button 
+              onClick={onNewQuestion}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-full text-base"
+            >
+              + Ask a new question
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -79,7 +106,7 @@ class PollClient {
     this.socket.on("connect", () => this.trigger("connect"));
     this.socket.on("disconnect", (reason) => this.trigger("disconnect", reason));
     this.socket.on("pollResults", (data) => this.trigger("pollResults", data));
-    this.socket.on("connectedStudents", (count) => this.trigger("connectedStudents", count));
+    this.socket.on("pollEnded", (data) => this.trigger("pollEnded", data));
   }
 
   on(event, callback) {
@@ -112,11 +139,10 @@ const TeacherPanel = () => {
     { id: "2", text: "", isCorrect: false },
   ]);
   const [pollResults, setPollResults] = useState(null);
-  const [connectedStudents, setConnectedStudents] = useState(0);
   const [currentPoll, setCurrentPoll] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [showResults, setShowResults] = useState(false);
+  const [timerEnded, setTimerEnded] = useState(false);
   const clientRef = useRef(null);
 
   useEffect(() => {
@@ -125,12 +151,10 @@ const TeacherPanel = () => {
 
     pollClient.on("connect", () => {
       setIsConnected(true);
-      setConnectionStatus("Connected");
     });
 
-    pollClient.on("disconnect", (reason) => {
+    pollClient.on("disconnect", () => {
       setIsConnected(false);
-      setConnectionStatus("Disconnected");
     });
 
     pollClient.on("pollResults", (results) => {
@@ -138,8 +162,8 @@ const TeacherPanel = () => {
       setShowResults(true);
     });
 
-    pollClient.on("connectedStudents", (count) => {
-      setConnectedStudents(count);
+    pollClient.on("pollEnded", () => {
+      setTimerEnded(true);
     });
 
     return () => pollClient.disconnect();
@@ -183,9 +207,15 @@ const TeacherPanel = () => {
     clientRef.current.createPoll(pollPayload);
     setCurrentPoll(pollPayload);
     setShowResults(true);
+    setTimerEnded(false);
     setPollResults(
       filteredOptions.reduce((acc, opt) => ({ ...acc, [opt.text]: 0 }), {})
     );
+
+    // Set timer to mark when poll ends
+    setTimeout(() => {
+      setTimerEnded(true);
+    }, pollPayload.timeLimit * 1000);
   };
 
   const handleNewQuestion = () => {
@@ -197,38 +227,34 @@ const TeacherPanel = () => {
     setShowResults(false);
     setPollResults(null);
     setCurrentPoll(null);
+    setTimerEnded(false);
+  };
+
+  const handleViewHistory = () => {
+    // TODO: Implement poll history view
+    console.log("View Poll History clicked");
+    alert("Poll History feature coming soon!");
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <Badge className="bg-purple-600 text-white px-4 py-2 rounded-full">
-            Intervue Poll
-          </Badge>
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
-              isConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-            }`}>
-              {isConnected ? <Wifi className="w-3 h-3 mr-2" /> : <WifiOff className="w-3 h-3 mr-2" />}
-              {connectionStatus}
-            </div>
-            <div className="flex items-center text-gray-600">
-              <Users className="w-4 h-4 mr-2" />
-              <span className="text-sm">{connectedStudents}</span>
-            </div>
-          </div>
-        </div>
-
         {showResults ? (
           <LiveResults
             results={pollResults || {}}
             question={currentPoll?.question}
             onNewQuestion={handleNewQuestion}
+            onViewHistory={handleViewHistory}
+            timerEnded={timerEnded}
           />
         ) : (
           <>
+           {/* Header */}
+        <div className="mb-6">
+          <Badge className="bg-indigo-600 text-white px-4 py-2 rounded-full">
+            Intervue Poll
+          </Badge>
+        </div>
             {/* Title */}
             <div className="mb-8">
               <h1 className="text-4xl font-bold text-gray-900 mb-4">Let's Get Started</h1>
@@ -260,7 +286,7 @@ const TeacherPanel = () => {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="Rahul Bajaj"
-                className="w-full bg-gray-100 border-0 text-base py-4 px-4 rounded-lg min-h-[120px] resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full bg-gray-100 border-0 text-base py-4 px-4 rounded-lg min-h-[120px] resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 maxLength={100}
               />
               <div className="text-right text-xs text-gray-500 mt-1">
@@ -278,7 +304,7 @@ const TeacherPanel = () => {
               <div className="space-y-3">
                 {options.map((opt, idx) => (
                   <div key={opt.id} className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
+                    <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
                       {idx + 1}
                     </div>
                     <Input
@@ -322,7 +348,7 @@ const TeacherPanel = () => {
               <Button
                 variant="outline"
                 onClick={addOption}
-                className="mt-4 border-dashed border-2 text-purple-600 border-purple-300 hover:bg-purple-50"
+                className="mt-4 border-dashed border-2 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add More option
@@ -335,7 +361,7 @@ const TeacherPanel = () => {
                 size="lg"
                 onClick={askQuestion}
                 disabled={!isConnected || !question.trim()}
-                className="bg-purple-600 hover:bg-purple-700 px-12 py-6 text-base rounded-full"
+                className="bg-indigo-600 hover:bg-indigo-700 px-12 py-6 text-base rounded-full"
               >
                 Ask Question
               </Button>
