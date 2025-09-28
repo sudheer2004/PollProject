@@ -1,62 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { io } from "socket.io-client";
 
-let socket;
-
-// LiveResults Component
-const LiveResults = ({ results, question }) => {
-  const getTotalResponses = () => {
-    return Object.values(results).reduce((sum, count) => sum + count, 0);
-  };
-
-  const getPercentage = (count) => {
-    const total = getTotalResponses();
-    return total > 0 ? Math.round((count / total) * 100) : 0;
-  };
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Question</h3>
-      
-      <div className="bg-gray-700 text-white rounded-t-lg p-4 mb-0">
-        <p className="text-sm">{question}</p>
-      </div>
-
-      <div className="border border-gray-300 rounded-b-lg p-4 space-y-3">
-        {Object.entries(results).map(([option, count], idx) => {
-          const percentage = getPercentage(count);
-
-          return (
-            <div key={option} className="flex items-center gap-0">
-              <div className="flex items-center bg-indigo-500 text-white rounded-md px-3 py-2 min-w-0" style={{ width: `${Math.max(percentage, 10)}%` }}>
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
-                  <span className="text-white text-xs font-semibold">
-                    {idx + 1}
-                  </span>
-                </div>
-                <span className="text-sm font-medium truncate">{option}</span>
-              </div>
-              
-              <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
-                <span className="text-sm font-semibold text-gray-900">
-                  {percentage}%
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 // Loading Spinner Component
 const LoadingSpinner = () => (
-  <div className="flex justify-center">
-    <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+  <div className="flex justify-center items-center">
+    <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
   </div>
 );
 
@@ -65,86 +16,110 @@ export default function StudentPanel() {
   const [studentName, setStudentName] = useState("");
   const [questionData, setQuestionData] = useState(null);
   const [answer, setAnswer] = useState("");
+  const [userAnswer, setUserAnswer] = useState("");
   const [results, setResults] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [totalResponses, setTotalResponses] = useState(0);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const socketRef = useRef(null);
 
   // Initialize socket connection
   useEffect(() => {
-    const connectionOptions = {
+    const socket = io("http://localhost:5001", {
       transports: ["websocket", "polling"],
       timeout: 20000,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-    };
+    });
 
-    socket = io("http://localhost:5001", connectionOptions);
+    socketRef.current = socket;
 
     socket.on("connect", () => {
+      console.log("Connected to server");
       setIsConnected(true);
       setError("");
     });
 
     socket.on("disconnect", () => {
+      console.log("Disconnected from server");
       setIsConnected(false);
     });
 
     socket.on("questionStarted", (poll) => {
+      console.log("Question started:", poll);
       setQuestionData(poll);
       setAnswer("");
+      setUserAnswer("");
       setResults(null);
       setHasSubmitted(false);
       setShowResults(false);
+      setIsSubmitting(false);
       setTimeLeft(poll.timeLimit || 60);
+      setError("");
+    });
+
+    // Listen for real-time timer updates from server
+    socket.on("timeUpdate", (data) => {
+      setTimeLeft(data.timeLeft);
     });
 
     socket.on("pollResults", (pollResults) => {
+      console.log("Poll results received:", pollResults);
       setResults(pollResults);
+      setTotalResponses(Object.values(pollResults).reduce((sum, count) => sum + count, 0));
     });
 
-    socket.on("answerSubmitted", () => {
+    socket.on("answerSubmitted", (data) => {
+      console.log("Answer submitted confirmation received:", data);
       setHasSubmitted(true);
+      setIsSubmitting(false);
+      setUserAnswer(answer);
+      // Don't change showResults here - keep showing the poll until it ends
+    });
+
+    socket.on("pollEnded", (data) => {
+      console.log("Poll ended:", data);
+      setResults(data.results);
+      setTotalResponses(data.totalResponses);
       setShowResults(true);
+      setTimeLeft(0);
     });
 
     socket.on("error", (errorData) => {
+      console.error("Socket error:", errorData);
       setError(errorData.message);
+      setIsSubmitting(false);
       setTimeout(() => setError(""), 5000);
     });
 
+    socket.on("joinConfirmed", (data) => {
+      console.log("Join confirmed:", data);
+    });
+
     return () => {
-      if (socket) socket.disconnect();
+      socket.disconnect();
     };
   }, []);
 
   // Join poll when student name is set
   useEffect(() => {
-    if (!studentName || !socket || !isConnected) return;
-    socket.emit("joinPoll", { studentName });
+    if (!studentName || !socketRef.current || !isConnected) return;
+    console.log("Joining poll as:", studentName);
+    socketRef.current.emit("joinPoll", { studentName });
   }, [studentName, isConnected]);
 
-  // Countdown timer
+  // Auto-submit when time runs out
   useEffect(() => {
-    if (timeLeft <= 0 || hasSubmitted) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (!hasSubmitted && answer) {
-            submitAnswer();
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timeLeft, hasSubmitted, answer]);
+    if (timeLeft === 0 && !hasSubmitted && answer && questionData && !isSubmitting) {
+      console.log("Time's up, auto-submitting answer:", answer);
+      submitAnswer();
+    }
+  }, [timeLeft, hasSubmitted, answer, questionData, isSubmitting]);
 
   const handleNameSubmit = () => {
     const trimmedName = enteredName.trim();
@@ -167,13 +142,34 @@ export default function StudentPanel() {
       return;
     }
 
-    if (!socket || !isConnected) {
+    if (!socketRef.current || !isConnected) {
       setError("Connection lost. Please refresh and try again.");
       return;
     }
 
-    socket.emit("submitAnswer", { studentName, answer });
+    if (hasSubmitted) {
+      setError("You have already submitted your answer");
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      setError("Time is up!");
+      return;
+    }
+
+    console.log("Submitting answer:", answer);
+    setIsSubmitting(true);
     setError("");
+    
+    socketRef.current.emit("submitAnswer", { studentName, answer });
+    
+    // Set a timeout to handle if the server doesn't respond
+    setTimeout(() => {
+      if (isSubmitting) {
+        setIsSubmitting(false);
+        setError("Submission timeout. Please try again.");
+      }
+    }, 5000);
   };
 
   const handleKeyPress = (e) => {
@@ -185,7 +181,7 @@ export default function StudentPanel() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // ------------------------
@@ -197,14 +193,14 @@ export default function StudentPanel() {
         <div className="w-full max-w-md mx-auto space-y-8 text-center">
           {/* Header Badge */}
           <div className="flex justify-center">
-            <Badge className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-              Intervue Poll
+            <Badge className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
+              ⚡ Intervue Poll
             </Badge>
           </div>
 
           {/* Title & Description */}
           <div className="space-y-4">
-            <h1 className="text-4xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900">
               Let's Get Started
             </h1>
             <p className="text-gray-600 text-base leading-relaxed">
@@ -213,9 +209,9 @@ export default function StudentPanel() {
           </div>
 
           {/* Name Input */}
-          <div className="space-y-4 pt-4">
+          <div className="space-y-6 pt-4">
             <div className="text-left">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-3">
                 Enter your Name
               </label>
               <Input
@@ -224,20 +220,20 @@ export default function StudentPanel() {
                 value={enteredName}
                 onChange={(e) => setEnteredName(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="w-full h-12 bg-gray-100 border-0 text-base"
+                className="w-full h-12 bg-gray-100 border-0 text-base rounded-lg"
                 maxLength={50}
                 disabled={!isConnected}
               />
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm bg-red-50 p-3 rounded">
+              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
                 {error}
               </div>
             )}
 
             <Button
-              className="w-full h-12 text-base bg-indigo-600 hover:bg-indigo-700 rounded-full"
+              className="w-full h-12 text-base bg-purple-600 hover:bg-purple-700 rounded-full"
               onClick={handleNameSubmit}
               disabled={!isConnected || !enteredName.trim()}
             >
@@ -256,33 +252,96 @@ export default function StudentPanel() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-md mx-auto space-y-8 text-center">
-          <Badge className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-            Intervue Poll
+          <Badge className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
+            ⚡ Intervue Poll
           </Badge>
           
-          <LoadingSpinner />
-          
-          <h2 className="text-2xl font-bold text-gray-900">
-            Wait for the teacher to ask questions..
-          </h2>
+          <div className="space-y-6">
+            <LoadingSpinner />
+            
+            <h2 className="text-2xl font-bold text-gray-900">
+              Wait for the teacher to ask questions..
+            </h2>
+            
+            {!isConnected && (
+              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                Connection lost. Please refresh the page.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   // ------------------------
-  // SHOW RESULTS
+  // SHOW RESULTS SCREEN
   // ------------------------
   if (showResults && results) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6 text-center">
-            <Badge className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-              Intervue Poll
-            </Badge>
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full space-y-8">
+          {/* Question Header */}
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Question 1</h3>
+              <div className="flex items-center text-gray-600">
+                <span className="text-lg">✅</span>
+                <span className="ml-1 font-mono">COMPLETED</span>
+              </div>
+            </div>
           </div>
-          <LiveResults results={results} question={questionData?.question} />
+          
+          {/* Question Card */}
+          <div className="border border-gray-300 rounded-lg overflow-hidden mx-auto max-w-lg">
+            {/* Question Header */}
+            <div className="bg-gray-600 text-white p-4">
+              <p className="text-sm">{questionData?.question}</p>
+            </div>
+            
+            {/* Results */}
+            <div className="bg-white p-4 space-y-3">
+              {Object.entries(results).map(([option, count], idx) => {
+                const percentage = totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0;
+                const isUserAnswer = option === userAnswer;
+                
+                return (
+                  <div key={option} className="flex items-center">
+                    {/* Progress Bar */}
+                    <div 
+                      className={`${isUserAnswer ? 'bg-green-600' : 'bg-purple-600'} text-white flex items-center px-3 py-2 rounded-md min-h-[40px]`}
+                      style={{ width: `${Math.max(percentage, 15)}%` }}
+                    >
+                      <div className="w-6 h-6 bg-white bg-opacity-30 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                        <span className="text-white text-xs font-semibold">{idx + 1}</span>
+                      </div>
+                      <span className="text-sm font-medium text-white truncate">{option}</span>
+                      {isUserAnswer && <span className="ml-2 text-xs">👤</span>}
+                    </div>
+                    
+                    {/* Percentage */}
+                    <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
+                      <span className="text-sm font-semibold text-gray-900">{percentage}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Wait message */}
+          <div className="text-center">
+            <p className="text-lg font-medium text-gray-900">
+              Wait for the teacher to ask a new question..
+            </p>
+          </div>
+
+          {/* Chat Icon */}
+          <div className="fixed bottom-6 right-6">
+            <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white cursor-pointer">
+              💬
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -292,57 +351,47 @@ export default function StudentPanel() {
   // ANSWERING SCREEN
   // ------------------------
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 text-center">
-          <Badge className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium">
-            Intervue Poll
-          </Badge>
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
+      <div className="max-w-2xl w-full space-y-8">
+        {/* Question Header with LIVE Timer */}
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Question 1</h3>
+            <div className="flex items-center text-red-600">
+              <span className="text-lg">⏰</span>
+              <span className="ml-1 font-mono">
+                {formatTime(Math.max(0, timeLeft))}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Error Messages */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
             <div className="text-red-800 text-sm">{error}</div>
           </div>
         )}
 
         {/* Question Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div className="border border-gray-300 rounded-lg overflow-hidden mx-auto max-w-lg">
           {questionData && (
-            <div className="space-y-6">
-              {/* Timer */}
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Question
-                </h3>
-                <div
-                  className={`px-4 py-2 rounded-full font-medium ${
-                    timeLeft > 10
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {formatTime(timeLeft)}
-                </div>
-              </div>
-
-              {/* Question */}
-              <div className="bg-gray-700 text-white rounded-lg p-4">
-                <p className="text-base">{questionData.question}</p>
+            <>
+              {/* Question Header */}
+              <div className="bg-gray-600 text-white p-4">
+                <p className="text-sm">{questionData.question}</p>
               </div>
 
               {/* Options */}
-              {!hasSubmitted && timeLeft > 0 ? (
-                <div className="space-y-3">
-                  {questionData.options.map((opt, idx) => (
+              <div className="bg-white p-4 space-y-3">
+                {!hasSubmitted && timeLeft > 0 ? (
+                  questionData.options.map((opt, idx) => (
                     <label
                       key={idx}
-                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
                         answer === opt
-                          ? "border-indigo-600 bg-indigo-50"
-                          : "border-gray-200 hover:border-indigo-300 hover:bg-gray-50"
+                          ? "border-purple-600 bg-purple-50"
+                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
                       }`}
                     >
                       <input
@@ -351,33 +400,53 @@ export default function StudentPanel() {
                         value={opt}
                         checked={answer === opt}
                         onChange={() => setAnswer(opt)}
-                        className="mr-3 h-4 w-4 text-indigo-600"
+                        className="mr-3 h-4 w-4 text-purple-600"
+                        disabled={isSubmitting}
                       />
-                      <span className="text-gray-900 font-medium">{opt}</span>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 text-xs font-semibold ${
+                        answer === opt ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
+                      }`}>
+                        {idx + 1}
+                      </div>
+                      <span className="text-gray-900">{opt}</span>
                     </label>
-                  ))}
-
-                  <Button
-                    className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 h-12 text-base rounded-full"
-                    onClick={submitAnswer}
-                    disabled={!answer || timeLeft <= 0}
-                  >
-                    Submit Answer
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <LoadingSpinner />
-                  <div className="text-gray-600 mt-4 text-lg">
-                    {hasSubmitted ? "Answer submitted!" : "Time's up!"}
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <LoadingSpinner />
+                    <div className="text-gray-600 mt-4">
+                      {hasSubmitted ? "Answer submitted! Waiting for results..." : "Time's up! Waiting for results..."}
+                    </div>
+                    {hasSubmitted && userAnswer && (
+                      <div className="mt-2 text-sm text-purple-600">
+                        Your answer: "{userAnswer}"
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm text-gray-500 mt-2">
-                    Waiting for results...
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </>
           )}
+        </div>
+
+        {/* Submit Button - Only show when answering */}
+        {!hasSubmitted && timeLeft > 0 && (
+          <div className="flex justify-center">
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full"
+              onClick={submitAnswer}
+              disabled={!answer || timeLeft <= 0 || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit"}
+            </Button>
+          </div>
+        )}
+
+        {/* Chat Icon */}
+        <div className="fixed bottom-6 right-6">
+          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white cursor-pointer">
+            💬
+          </div>
         </div>
       </div>
     </div>
