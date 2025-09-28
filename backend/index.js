@@ -339,7 +339,12 @@ io.on("connection", (socket) => {
           return;
         }
         
+        // Send time update to all connected clients
         io.emit("timeUpdate", { timeLeft });
+        // Debug log every 10 seconds
+        if (timeLeft % 10 === 0) {
+          log(`Timer update: ${timeLeft}s remaining`, "INFO");
+        }
       }, 1000);
 
     } catch (error) {
@@ -388,14 +393,18 @@ io.on("connection", (socket) => {
       // Update results
       currentPoll.results[answer] = (currentPoll.results[answer] || 0) + 1;
 
-      // Immediately confirm submission to the student
+      // IMMEDIATELY send confirmation and results to the submitting student
       socket.emit("answerSubmitted", { 
         answer: answer,
-        timestamp: answerData.timestamp 
+        timestamp: answerData.timestamp,
+        timeLeft: calculateTimeRemaining()
       });
       
-      // Immediately broadcast updated results to ALL clients
-      io.emit("pollResults", currentPoll.results);
+      // IMMEDIATELY send updated results to the submitting student
+      socket.emit("pollResults", currentPoll.results);
+      
+      // Then broadcast to everyone else
+      socket.broadcast.emit("pollResults", currentPoll.results);
 
       const totalResponses = Object.values(currentPoll.results).reduce((sum, count) => sum + count, 0);
       log(`Answer submitted: ${studentName} -> "${answer}" (${totalResponses}/${connectedStudents.size} responses)`, "INFO");

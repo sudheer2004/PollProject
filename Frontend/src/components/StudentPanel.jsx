@@ -65,13 +65,15 @@ export default function StudentPanel() {
 
     // Listen for real-time timer updates from server
     socket.on("timeUpdate", (data) => {
+      console.log("Timer update received:", data.timeLeft);
       setTimeLeft(data.timeLeft);
     });
 
     socket.on("pollResults", (pollResults) => {
       console.log("Poll results received:", pollResults);
       setResults(pollResults);
-      setTotalResponses(Object.values(pollResults).reduce((sum, count) => sum + count, 0));
+      const total = Object.values(pollResults).reduce((sum, count) => sum + count, 0);
+      setTotalResponses(total);
     });
 
     socket.on("answerSubmitted", (data) => {
@@ -79,7 +81,8 @@ export default function StudentPanel() {
       setHasSubmitted(true);
       setIsSubmitting(false);
       setUserAnswer(answer);
-      // Don't change showResults here - keep showing the poll until it ends
+      // Immediately switch to results view after successful submission
+      setShowResults(true);
     });
 
     socket.on("pollEnded", (data) => {
@@ -88,6 +91,7 @@ export default function StudentPanel() {
       setTotalResponses(data.totalResponses);
       setShowResults(true);
       setTimeLeft(0);
+      // Poll is now completely finished, can show final state
     });
 
     socket.on("error", (errorData) => {
@@ -113,13 +117,18 @@ export default function StudentPanel() {
     socketRef.current.emit("joinPoll", { studentName });
   }, [studentName, isConnected]);
 
-  // Auto-submit when time runs out
+  // Auto-submit when time runs out (but only if not already submitted)
   useEffect(() => {
     if (timeLeft === 0 && !hasSubmitted && answer && questionData && !isSubmitting) {
       console.log("Time's up, auto-submitting answer:", answer);
-      submitAnswer();
+      const timer = setTimeout(() => {
+        if (!hasSubmitted && !isSubmitting) {
+          submitAnswer();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [timeLeft, hasSubmitted, answer, questionData, isSubmitting]);
+  }, [timeLeft]);
 
   const handleNameSubmit = () => {
     const trimmedName = enteredName.trim();
@@ -275,19 +284,21 @@ export default function StudentPanel() {
   }
 
   // ------------------------
-  // SHOW RESULTS SCREEN
+  // SHOW RESULTS SCREEN - Show when student has submitted OR poll has ended
   // ------------------------
   if (showResults && results) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-2xl w-full space-y-8">
-          {/* Question Header */}
+          {/* Question Header with Timer */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Question 1</h3>
-              <div className="flex items-center text-gray-600">
-                <span className="text-lg">✅</span>
-                <span className="ml-1 font-mono">COMPLETED</span>
+              <div className="flex items-center text-red-600">
+                <span className="text-lg">⏰</span>
+                <span className="ml-1 font-mono">
+                  {formatTime(Math.max(0, timeLeft))}
+                </span>
               </div>
             </div>
           </div>
@@ -316,7 +327,6 @@ export default function StudentPanel() {
                         <span className="text-white text-xs font-semibold">{idx + 1}</span>
                       </div>
                       <span className="text-sm font-medium text-white truncate">{option}</span>
-                      {isUserAnswer && <span className="ml-2 text-xs">👤</span>}
                     </div>
                     
                     {/* Percentage */}
@@ -382,40 +392,80 @@ export default function StudentPanel() {
                 <p className="text-sm">{questionData.question}</p>
               </div>
 
-              {/* Options */}
+              {/* Options or Submitted State */}
               <div className="bg-white p-4 space-y-3">
-                {!hasSubmitted && timeLeft > 0 ? (
-                  questionData.options.map((opt, idx) => (
-                    <label
-                      key={idx}
-                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
-                        answer === opt
-                          ? "border-purple-600 bg-purple-50"
-                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="answer"
-                        value={opt}
-                        checked={answer === opt}
-                        onChange={() => setAnswer(opt)}
-                        className="mr-3 h-4 w-4 text-purple-600"
-                        disabled={isSubmitting}
-                      />
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 text-xs font-semibold ${
-                        answer === opt ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
-                      }`}>
-                        {idx + 1}
+                {timeLeft > 0 ? (
+                  hasSubmitted ? (
+                    // Show submitted state but keep timer running
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-green-600 text-2xl">✓</span>
                       </div>
-                      <span className="text-gray-900">{opt}</span>
-                    </label>
-                  ))
+                      <div className="text-green-600 font-medium mb-2">
+                        Answer Submitted Successfully!
+                      </div>
+                      <div className="text-sm text-gray-600 mb-4">
+                        Your answer: "{userAnswer}"
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Waiting for other students... Timer continues below
+                      </div>
+                      
+                      {/* Show live results if available */}
+                      {results && Object.keys(results).length > 0 && (
+                        <div className="mt-6 space-y-2">
+                          <div className="text-sm text-gray-600 mb-3">Live Results:</div>
+                          {Object.entries(results).map(([option, count], idx) => {
+                            const total = Object.values(results).reduce((sum, c) => sum + c, 0);
+                            const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                            const isUserAnswer = option === userAnswer;
+                            
+                            return (
+                              <div key={option} className="flex items-center text-sm">
+                                <div className={`w-4 h-4 rounded-full mr-2 ${isUserAnswer ? 'bg-green-500' : 'bg-purple-500'}`}></div>
+                                <span className={`flex-1 ${isUserAnswer ? 'font-medium' : ''}`}>{option}</span>
+                                <span className="font-medium">{percentage}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Show options for answering
+                    questionData.options.map((opt, idx) => (
+                      <label
+                        key={idx}
+                        className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
+                          answer === opt
+                            ? "border-purple-600 bg-purple-50"
+                            : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="answer"
+                          value={opt}
+                          checked={answer === opt}
+                          onChange={() => setAnswer(opt)}
+                          className="mr-3 h-4 w-4 text-purple-600"
+                          disabled={isSubmitting}
+                        />
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 text-xs font-semibold ${
+                          answer === opt ? 'bg-purple-600 text-white' : 'bg-gray-300 text-gray-600'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <span className="text-gray-900">{opt}</span>
+                      </label>
+                    ))
+                  )
                 ) : (
+                  // Time is up - show final waiting state
                   <div className="text-center py-8">
                     <LoadingSpinner />
                     <div className="text-gray-600 mt-4">
-                      {hasSubmitted ? "Answer submitted! Waiting for results..." : "Time's up! Waiting for results..."}
+                      {hasSubmitted ? "Time's up! Waiting for final results..." : "Time's up! Poll ended without submission"}
                     </div>
                     {hasSubmitted && userAnswer && (
                       <div className="mt-2 text-sm text-purple-600">
@@ -429,16 +479,32 @@ export default function StudentPanel() {
           )}
         </div>
 
-        {/* Submit Button - Only show when answering */}
+        {/* Submit Button - Only show when NOT submitted and time is left */}
         {!hasSubmitted && timeLeft > 0 && (
           <div className="flex justify-center">
             <Button
-              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full disabled:opacity-50"
               onClick={submitAnswer}
               disabled={!answer || timeLeft <= 0 || isSubmitting}
             >
-              {isSubmitting ? "Submitting..." : "Submit"}
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Submitting...
+                </div>
+              ) : (
+                "Submit"
+              )}
             </Button>
+          </div>
+        )}
+
+        {/* Timer Info - Show even after submission */}
+        {hasSubmitted && timeLeft > 0 && (
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Poll continues for {formatTime(timeLeft)} more...
+            </p>
           </div>
         )}
 
