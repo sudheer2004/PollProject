@@ -156,4 +156,3 @@ const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   log(`Server running on port ${PORT}`, "SUCCESS");
 });
-

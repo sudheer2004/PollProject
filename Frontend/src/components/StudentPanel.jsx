@@ -3,8 +3,54 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { io } from "socket.io-client";
 
-// Debug version with connection testing
 let socket;
+
+// LiveResults Component
+const LiveResults = ({ results, question }) => {
+  const getTotalResponses = () => {
+    return Object.values(results).reduce((sum, count) => sum + count, 0);
+  };
+
+  const getPercentage = (count) => {
+    const total = getTotalResponses();
+    return total > 0 ? Math.round((count / total) * 100) : 0;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto">
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Question</h3>
+      
+      <div className="bg-gray-700 text-white rounded-t-lg p-4 mb-0">
+        <p className="text-sm">{question}</p>
+      </div>
+
+      <div className="border border-gray-300 rounded-b-lg p-4 space-y-3">
+        {Object.entries(results).map(([option, count], idx) => {
+          const percentage = getPercentage(count);
+
+          return (
+            <div key={option} className="flex items-center gap-0">
+              <div className="flex items-center bg-indigo-500 text-white rounded-md px-3 py-2 min-w-0" style={{ width: `${Math.max(percentage, 10)}%` }}>
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
+                  <span className="text-white text-xs font-semibold">
+                    {idx + 1}
+                  </span>
+                </div>
+                <span className="text-sm font-medium truncate">{option}</span>
+              </div>
+              
+              <div className="flex-1 bg-gray-100 h-10 flex items-center justify-end px-3">
+                <span className="text-sm font-semibold text-gray-900">
+                  {percentage}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export default function StudentPanel() {
   const [enteredName, setEnteredName] = useState("");
@@ -14,150 +60,70 @@ export default function StudentPanel() {
   const [results, setResults] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [error, setError] = useState("");
-  const [debugLogs, setDebugLogs] = useState([]);
-
-  // Debug logging function
-  const addDebugLog = (message) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setDebugLogs((prev) => [...prev.slice(-9), `[${timestamp}] ${message}`]); // Keep last 10 logs
-    console.log(`[STUDENT DEBUG] ${message}`);
-  };
 
   // Initialize socket connection
   useEffect(() => {
-    addDebugLog("Initializing socket connection...");
-
-    try {
-      // Try different connection approaches
-      const connectionOptions = {
-        transports: ["websocket", "polling"],
-        timeout: 20000,
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        autoConnect: true,
-        forceNew: true,
-      };
-
-      // Try localhost first, then 127.0.0.1 as fallback
-      socket = io("http://localhost:5001", connectionOptions);
-      addDebugLog("Socket created with localhost:5001");
-
-      // Connection event handlers
-      socket.on("connect", () => {
-        addDebugLog("✅ Connected successfully!");
-        setIsConnected(true);
-        setConnectionStatus("Connected");
-        setError("");
-      });
-
-      socket.on("disconnect", (reason) => {
-        addDebugLog(`❌ Disconnected: ${reason}`);
-        setIsConnected(false);
-        setConnectionStatus("Disconnected");
-        setError(`Disconnected: ${reason}`);
-      });
-
-      socket.on("connect_error", (error) => {
-        addDebugLog(`❌ Connection error: ${error.message}`);
-        setIsConnected(false);
-        setConnectionStatus("Connection Error");
-        setError(`Connection failed: ${error.message}`);
-
-        // Try fallback to 127.0.0.1
-        setTimeout(() => {
-          addDebugLog("Trying fallback connection to 127.0.0.1:5001");
-          socket.disconnect();
-          socket = io("http://127.0.0.1:5001", connectionOptions);
-          setupSocketEvents();
-        }, 2000);
-      });
-
-      socket.on("reconnect", (attemptNumber) => {
-        addDebugLog(`🔄 Reconnected after ${attemptNumber} attempts`);
-        setIsConnected(true);
-        setConnectionStatus("Reconnected");
-      });
-
-      socket.on("reconnect_attempt", (attemptNumber) => {
-        addDebugLog(`🔄 Reconnection attempt #${attemptNumber}`);
-        setConnectionStatus(`Reconnecting... (${attemptNumber})`);
-      });
-
-      socket.on("reconnect_error", (error) => {
-        addDebugLog(`❌ Reconnection error: ${error.message}`);
-      });
-
-      socket.on("reconnect_failed", () => {
-        addDebugLog("❌ All reconnection attempts failed");
-        setConnectionStatus("Connection Failed");
-        setError(
-          "Unable to connect to server. Please check if the server is running on port 5001."
-        );
-      });
-
-      setupSocketEvents();
-    } catch (error) {
-      addDebugLog(`❌ Socket initialization error: ${error.message}`);
-      setError("Failed to initialize socket connection");
-    }
-
-    return () => {
-      if (socket) {
-        addDebugLog("Cleaning up socket connection");
-        socket.disconnect();
-      }
+    const connectionOptions = {
+      transports: ["websocket", "polling"],
+      timeout: 20000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     };
-  }, []);
 
-  // Setup socket event listeners
-  const setupSocketEvents = () => {
-    if (!socket) return;
+    socket = io("http://localhost:5001", connectionOptions);
 
-    socket.on("joinConfirmed", (data) => {
-      addDebugLog(`✅ Join confirmed: ${data.studentName}`);
+    socket.on("connect", () => {
+      setIsConnected(true);
+      setConnectionStatus("Connected");
+      setError("");
+    });
+
+    socket.on("disconnect", (reason) => {
+      setIsConnected(false);
+      setConnectionStatus("Disconnected");
+    });
+
+    socket.on("connect_error", () => {
+      setIsConnected(false);
+      setConnectionStatus("Connection Error");
     });
 
     socket.on("questionStarted", (poll) => {
-      addDebugLog(`📝 Question received: ${poll.question}`);
       setQuestionData(poll);
       setAnswer("");
       setResults(null);
       setHasSubmitted(false);
+      setShowResults(false);
       setTimeLeft(poll.timeLimit || 60);
     });
 
-    socket.on("updateResults", (pollResults) => {
-      addDebugLog("📊 Results updated");
-      setResults(pollResults.results);
-    });
-
-    socket.on("questionEnded", (endedPoll) => {
-      addDebugLog("🏁 Question ended");
-      setResults(endedPoll.results);
-      setTimeLeft(0);
+    socket.on("pollResults", (pollResults) => {
+      setResults(pollResults);
     });
 
     socket.on("answerSubmitted", () => {
-      addDebugLog("✅ Answer submission confirmed");
       setHasSubmitted(true);
+      setShowResults(true);
     });
 
     socket.on("error", (errorData) => {
-      addDebugLog(`❌ Server error: ${errorData.message}`);
       setError(errorData.message);
       setTimeout(() => setError(""), 5000);
     });
-  };
 
-  // Join poll when student name is confirmed
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, []);
+
+  // Join poll when student name is set
   useEffect(() => {
     if (!studentName || !socket || !isConnected) return;
-
-    addDebugLog(`Attempting to join poll as: ${studentName}`);
     socket.emit("joinPoll", { studentName });
   }, [studentName, isConnected]);
 
@@ -169,7 +135,6 @@ export default function StudentPanel() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (!hasSubmitted && answer) {
-            addDebugLog("⏰ Auto-submitting due to timeout");
             submitAnswer();
           }
           return 0;
@@ -191,7 +156,6 @@ export default function StudentPanel() {
       setError("Not connected to server. Please wait or refresh the page.");
       return;
     }
-    addDebugLog(`Setting student name: ${trimmedName}`);
     setStudentName(trimmedName);
     setError("");
   };
@@ -208,85 +172,21 @@ export default function StudentPanel() {
       return;
     }
 
-    addDebugLog(`Submitting answer: ${answer}`);
     socket.emit("submitAnswer", { studentName, answer });
     setError("");
   };
 
-  const testConnection = async () => {
-    addDebugLog("Testing server connection...");
-    setConnectionStatus("Testing...");
-
-    try {
-      const response = await fetch("http://localhost:5001/health");
-      if (response.ok) {
-        const data = await response.json();
-        addDebugLog("✅ Server is reachable via HTTP");
-        setConnectionStatus("Server reachable");
-      } else {
-        addDebugLog("❌ Server HTTP error: " + response.status);
-        setConnectionStatus("Server error");
-      }
-    } catch (error) {
-      addDebugLog("❌ Server not reachable: " + error.message);
-      setConnectionStatus("Server unreachable");
-      setError("Cannot reach server. Make sure it's running on port 5001.");
-    }
-  };
-
-  // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
       handleNameSubmit();
     }
   };
 
-  // Format time display
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
-  // Debug panel component
-  const DebugPanel = () => (
-    <div className="mt-6 p-4 bg-gray-100 rounded-lg text-xs">
-      <h4 className="font-bold mb-2">Debug Information:</h4>
-      <div className="space-y-1">
-        <div>
-          Status: <span className="font-mono">{connectionStatus}</span>
-        </div>
-        <div>
-          Connected:{" "}
-          <span className="font-mono">{isConnected ? "Yes" : "No"}</span>
-        </div>
-        <div>
-          Socket ID: <span className="font-mono">{socket?.id || "N/A"}</span>
-        </div>
-        <div>
-          Transport:{" "}
-          <span className="font-mono">
-            {socket?.io?.engine?.transport?.name || "N/A"}
-          </span>
-        </div>
-      </div>
-      <div className="mt-3">
-        <div className="font-bold">Recent Logs:</div>
-        <div className="bg-black text-green-400 p-2 rounded font-mono text-xs h-32 overflow-y-auto">
-          {debugLogs.map((log, idx) => (
-            <div key={idx}>{log}</div>
-          ))}
-        </div>
-      </div>
-      <Button
-        onClick={testConnection}
-        size="sm"
-        className="mt-2 bg-blue-600 hover:bg-blue-700"
-      >
-        Test Server Connection
-      </Button>
-    </div>
-  );
 
   // ------------------------
   // ONBOARDING SCREEN
@@ -378,16 +278,53 @@ export default function StudentPanel() {
               </Button>
             </div>
           </div>
-
-          {/* Debug Panel */}
-          <DebugPanel />
         </div>
       </div>
     );
   }
 
   // ------------------------
-  // STUDENT PANEL
+  // STUDENT PANEL - SHOW RESULTS
+  // ------------------------
+  if (showResults && results) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Welcome, {studentName}!
+              </h2>
+              <div
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+                  isConnected
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full mr-2 ${
+                    isConnected ? "bg-green-500" : "bg-red-500"
+                  }`}
+                ></div>
+                {isConnected ? "Connected" : "Disconnected"}
+              </div>
+            </div>
+          </div>
+
+          {/* Live Results */}
+          <LiveResults
+            results={results}
+            question={questionData?.question}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------
+  // STUDENT PANEL - ANSWERING
   // ------------------------
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -502,48 +439,6 @@ export default function StudentPanel() {
             </div>
           )}
         </div>
-
-        {/* Results Panel */}
-        {results && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              Live Results
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(results).map(([opt, count]) => {
-                const total = Object.values(results).reduce(
-                  (sum, c) => sum + c,
-                  0
-                );
-                const percentage =
-                  total > 0 ? Math.round((count / total) * 100) : 0;
-
-                return (
-                  <div
-                    key={opt}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <span className="font-medium text-gray-900">{opt}</span>
-                    <div className="flex items-center gap-4">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-purple-600 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 w-16 text-right">
-                        {count} ({percentage}%)
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Debug Panel */}
-        <DebugPanel />
       </div>
     </div>
   );
