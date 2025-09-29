@@ -281,7 +281,22 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // End previous poll if exists
+      // Check if previous poll can be replaced
+      if (currentPoll && currentPoll.isActive) {
+        const totalAnswered = studentAnswers.size;
+        const totalStudents = connectedStudents.size;
+        
+        // Block if there are unanswered students
+        if (totalAnswered < totalStudents && totalStudents > 0) {
+          socket.emit("error", { 
+            message: `Cannot start new poll. ${totalStudents - totalAnswered} student(s) haven't answered yet. Wait for all students to answer or for the timer to end.` 
+          });
+          log(`Poll creation blocked: ${totalStudents - totalAnswered} students haven't answered`, "WARNING");
+          return;
+        }
+      }
+
+      // End previous poll if exists (now only if all answered or timer ended)
       if (currentPoll && currentPoll.isActive) {
         await endCurrentPoll(false);
       }
@@ -317,8 +332,15 @@ io.on("connection", (socket) => {
       
       // Send initial empty results
       io.emit("pollResults", currentPoll.results);
+      
+      // IMPORTANT: Broadcast current student count immediately
+      io.emit("studentUpdate", { 
+        totalStudents: connectedStudents.size,
+        students: Array.from(connectedStudents.keys())
+      });
 
       log(`Poll started: "${currentPoll.question}" (${currentPoll.timeLimit}s, ${validOptions.length} options)`, "SUCCESS");
+      log(`Current connected students: ${connectedStudents.size}`, "INFO");
 
       // Set auto-end timer
       pollTimer = setTimeout(() => {

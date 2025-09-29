@@ -23,9 +23,16 @@ const TeacherPanel = () => {
   const [showResults, setShowResults] = useState(false);
   const [timerEnded, setTimerEnded] = useState(false);
   
+  // Track connected students and time remaining
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  
   // History state
   const [pollHistory, setPollHistory] = useState([]);
   const [currentView, setCurrentView] = useState("form"); // "form", "results", "history"
+  
+  // Error state
+  const [error, setError] = useState("");
   
   const socketRef = useRef(null);
 
@@ -42,6 +49,8 @@ const TeacherPanel = () => {
 
     socket.on("connect", () => {
       setIsConnected(true);
+      // Request initial student count
+      socket.emit("getCurrentPoll");
     });
 
     socket.on("disconnect", () => {
@@ -54,10 +63,29 @@ const TeacherPanel = () => {
 
     socket.on("pollEnded", () => {
       setTimerEnded(true);
+      setTimeRemaining(0);
     });
 
     socket.on("pollHistory", (history) => {
       setPollHistory(history);
+    });
+
+    // Listen for student updates
+    socket.on("studentUpdate", (data) => {
+      console.log("Student update received:", data);
+      setTotalStudents(data.totalStudents || 0);
+    });
+
+    // Listen for time updates
+    socket.on("timeUpdate", (data) => {
+      setTimeRemaining(data.timeLeft);
+    });
+
+    // Listen for errors from backend
+    socket.on("error", (errorData) => {
+      setError(errorData.message);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setError(""), 5000);
     });
 
     return () => socket.disconnect();
@@ -81,14 +109,10 @@ const TeacherPanel = () => {
     setShowResults(true);
     setCurrentView("results");
     setTimerEnded(false);
+    setTimeRemaining(parseInt(timeLimit));
     setPollResults(
       filteredOptions.reduce((acc, opt) => ({ ...acc, [opt.text]: 0 }), {})
     );
-
-    // Set timer to mark when poll ends
-    setTimeout(() => {
-      setTimerEnded(true);
-    }, pollPayload.timeLimit * 1000);
   };
 
   const handleNewQuestion = () => {
@@ -101,7 +125,9 @@ const TeacherPanel = () => {
     setPollResults(null);
     setCurrentPoll(null);
     setTimerEnded(false);
+    setTimeRemaining(0);
     setCurrentView("form");
+    setError(""); // Clear any errors
   };
 
   const handleViewHistory = () => {
@@ -116,6 +142,14 @@ const TeacherPanel = () => {
   const handleBackToForm = () => {
     setCurrentView("form");
   };
+
+  // Calculate total responses
+  const totalResponses = pollResults 
+    ? Object.values(pollResults).reduce((sum, count) => sum + count, 0) 
+    : 0;
+
+  // Determine if all students have responded
+  const allStudentsResponded = totalStudents > 0 && totalResponses >= totalStudents;
 
   // Render based on current view
   if (currentView === "history") {
@@ -135,6 +169,10 @@ const TeacherPanel = () => {
         onNewQuestion={handleNewQuestion}
         onViewHistory={handleViewHistory}
         timerEnded={timerEnded}
+        totalStudents={totalStudents}
+        totalResponses={totalResponses}
+        allStudentsResponded={allStudentsResponded}
+        timeRemaining={timeRemaining}
       />
     );
   }
@@ -153,7 +191,16 @@ const TeacherPanel = () => {
             </div>
           )}
 
-          {/* Question Form Component - Now contains all header elements */}
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="text-red-800 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>
+                {error}
+              </div>
+            </div>
+          )}
+
+          {/* Question Form Component */}
           <QuestionForm
             question={question}
             setQuestion={setQuestion}
@@ -166,6 +213,11 @@ const TeacherPanel = () => {
           />
         </div>
       </div>
+
+      {/* Add Sora Font */}
+      <style jsx>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@100;200;300;400;500;600;700;800@display=swap');
+      `}</style>
     </div>
   );
 };

@@ -534,8 +534,8 @@ export default function StudentPanel() {
               <p 
                 style={{
                   fontFamily: 'Sora, sans-serif',
-                  fontSize: '18px',
-                  fontWeight: 500,
+                  fontSize: '24px',
+                  fontWeight: 600,
                   color: '#000000'
                 }}
               >

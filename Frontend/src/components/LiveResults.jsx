@@ -1,6 +1,16 @@
 import React, { useState } from "react";
 
-const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory, timerEnded }) => {
+const LiveResults = ({ 
+  results = {}, 
+  question = "", 
+  onNewQuestion, 
+  onViewHistory, 
+  timerEnded,
+  totalStudents = 0,
+  totalResponses = 0,
+  allStudentsResponded = false,
+  timeRemaining = 0
+}) => {
   const [selectedOption, setSelectedOption] = useState(null);
 
   // Calculate total responses
@@ -19,6 +29,9 @@ const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory
   };
 
   const optionsData = getOptionsData();
+
+  // Button should be enabled only when timer ended OR all students responded
+  const canStartNewQuestion = timerEnded || allStudentsResponded;
 
   return (
     <div className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
@@ -49,8 +62,8 @@ const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory
       {/* Main Content Container - Vertically Centered */}
       <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
         <div className="flex flex-col items-end" style={{ width: '727px' }}>
-          {/* Question Label */}
-          <div className="mb-6 self-start">
+          {/* Question Label with Stats */}
+          <div className="mb-6 self-start w-full flex items-center justify-between">
             <h2 
               className="text-left"
               style={{
@@ -62,6 +75,51 @@ const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory
             >
               Question
             </h2>
+            
+            {/* Live Stats */}
+            {totalStudents > 0 && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span style={{
+                    fontFamily: 'Sora, sans-serif',
+                    fontSize: '14px',
+                    color: '#666666',
+                    fontWeight: 500
+                  }}>
+                    Responses:
+                  </span>
+                  <span style={{
+                    fontFamily: 'Sora, sans-serif',
+                    fontSize: '16px',
+                    color: allStudentsResponded ? '#10B981' : '#8F64E1',
+                    fontWeight: 600
+                  }}>
+                    {totalResponses}/{totalStudents}
+                  </span>
+                </div>
+                
+                {!timerEnded && (
+                  <div className="flex items-center gap-2">
+                    <span style={{
+                      fontFamily: 'Sora, sans-serif',
+                      fontSize: '14px',
+                      color: '#666666',
+                      fontWeight: 500
+                    }}>
+                      Time:
+                    </span>
+                    <span style={{
+                      fontFamily: 'Sora, sans-serif',
+                      fontSize: '16px',
+                      color: timeRemaining <= 10 ? '#EF4444' : '#FF9800',
+                      fontWeight: 600
+                    }}>
+                      {timeRemaining}s
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Question Card - Responsive height */}
@@ -197,8 +255,9 @@ const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory
           {/* Ask New Question Button */}
           <div>
             <button
-              onClick={onNewQuestion}
-              className="text-white font-semibold flex items-center justify-center"
+              onClick={canStartNewQuestion ? onNewQuestion : undefined}
+              disabled={!canStartNewQuestion}
+              className="text-white font-semibold flex items-center justify-center transition-all duration-200"
               style={{
                 width: '306px',
                 height: '58px',
@@ -208,7 +267,8 @@ const LiveResults = ({ results = {}, question = "", onNewQuestion, onViewHistory
                 fontSize: '18px',
                 fontWeight: 600,
                 border: 'none',
-                cursor: 'pointer'
+                cursor: canStartNewQuestion ? 'pointer' : 'not-allowed',
+                opacity: canStartNewQuestion ? 1 : 0.5
               }}
             >
               + Ask a new question
