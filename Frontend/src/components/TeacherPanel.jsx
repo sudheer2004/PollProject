@@ -37,7 +37,7 @@ const TeacherPanel = () => {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    const socket = io("http://localhost:5001", {
+    const socket = io("https://pollproject.onrender.com/", {
       transports: ["websocket", "polling"],
       timeout: 20000,
       reconnection: true,
